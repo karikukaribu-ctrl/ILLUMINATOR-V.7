@@ -1,0 +1,546 @@
+/* ============================= */
+/* BASE */
+/* ============================= */
+
+*{
+box-sizing:border-box;
+margin:0;
+padding:0;
+}
+
+body{
+
+font-family:'Yusei Magic',sans-serif;
+
+background:#d9c0a6;
+
+color:#222;
+
+height:100vh;
+
+display:flex;
+flex-direction:column;
+
+transition:background .3s,color .3s;
+
+}
+
+/* ============================= */
+/* THEMES */
+/* ============================= */
+
+body.theme-automne{
+background:#d9c0a6;
+}
+
+body.theme-printemps{
+background:#d8e6c3;
+}
+
+body.theme-ete{
+background:#efe0a8;
+}
+
+body.theme-hiver{
+background:#dde7ef;
+}
+
+body.dark{
+
+background:#111;
+color:#eee;
+
+}
+
+/* ============================= */
+/* TOPBAR */
+/* ============================= */
+
+.topbar{
+
+display:flex;
+justify-content:space-between;
+align-items:center;
+
+padding:12px 20px;
+
+background:rgba(255,255,255,0.25);
+
+backdrop-filter:blur(10px);
+
+border-bottom:1px solid rgba(0,0,0,0.1);
+
+}
+
+.logo{
+
+font-size:24px;
+letter-spacing:2px;
+
+}
+
+.view-selector button{
+
+margin-right:8px;
+padding:6px 12px;
+
+border:none;
+border-radius:8px;
+
+background:rgba(255,255,255,0.4);
+
+cursor:pointer;
+
+}
+
+.view-selector button:hover{
+
+background:#c56f35;
+color:white;
+
+}
+
+/* ============================= */
+/* CONTROLS */
+/* ============================= */
+
+.controls{
+
+display:flex;
+align-items:center;
+
+gap:10px;
+
+}
+
+.controls button,
+.controls select{
+
+padding:6px 10px;
+border-radius:6px;
+border:none;
+
+background:rgba(255,255,255,0.3);
+
+cursor:pointer;
+
+}
+
+/* ============================= */
+/* LAYOUT */
+/* ============================= */
+
+.layout{
+
+flex:1;
+
+display:grid;
+
+grid-template-columns:
+
+260px
+1fr
+300px;
+
+overflow:hidden;
+
+}
+
+/* ============================= */
+/* LEFT PANEL */
+/* ============================= */
+
+.panel-left{
+
+padding:20px;
+
+border-right:1px solid rgba(0,0,0,0.1);
+
+overflow:auto;
+
+}
+
+.panel-left h2{
+
+margin-bottom:12px;
+
+}
+
+#projectList div{
+
+padding:8px;
+margin-bottom:6px;
+
+background:rgba(255,255,255,0.4);
+
+border-radius:6px;
+
+cursor:pointer;
+
+}
+
+#projectList div:hover{
+
+background:#c56f35;
+color:white;
+
+}
+
+/* ============================= */
+/* CENTER PANEL */
+/* ============================= */
+
+.panel-center{
+
+overflow:auto;
+
+padding:20px;
+
+}
+
+.view{
+
+display:block;
+
+}
+
+.hidden{
+
+display:none;
+
+}
+
+/* ============================= */
+/* DASHBOARD */
+/* ============================= */
+
+.dashboard-header{
+
+display:flex;
+
+justify-content:space-between;
+
+margin-bottom:20px;
+
+}
+
+#todayTimeline{
+
+display:flex;
+
+flex-direction:column;
+
+gap:6px;
+
+}
+
+/* ============================= */
+/* TIMELINE */
+/* ============================= */
+
+.timeline-slot{
+
+height:50px;
+
+border-left:4px solid rgba(0,0,0,0.1);
+
+padding-left:8px;
+
+display:flex;
+align-items:center;
+
+background:rgba(255,255,255,0.2);
+
+}
+
+.timeline-task{
+
+background:#c56f35;
+
+padding:6px 10px;
+
+border-radius:6px;
+
+color:white;
+
+cursor:grab;
+
+}
+
+/* ============================= */
+/* WEEK GRID */
+/* ============================= */
+
+#weekGrid{
+
+display:grid;
+
+grid-template-columns:repeat(7,1fr);
+
+gap:10px;
+
+}
+
+.week-day{
+
+background:rgba(255,255,255,0.3);
+
+padding:10px;
+
+border-radius:10px;
+
+min-height:120px;
+
+}
+
+/* ============================= */
+/* MONTH GRID */
+/* ============================= */
+
+#monthGrid{
+
+display:grid;
+
+grid-template-columns:repeat(7,1fr);
+
+gap:6px;
+
+}
+
+.month-day{
+
+background:rgba(255,255,255,0.25);
+
+height:80px;
+
+border-radius:6px;
+
+}
+
+/* ============================= */
+/* PROJECT CARDS */
+/* ============================= */
+
+#projectCards{
+
+display:grid;
+
+grid-template-columns:repeat(auto-fill,200px);
+
+gap:20px;
+
+}
+
+.project-card{
+
+padding:14px;
+
+border-radius:12px;
+
+background:rgba(255,255,255,0.4);
+
+cursor:pointer;
+
+transition:transform .2s;
+
+}
+
+.project-card:hover{
+
+transform:scale(1.05);
+
+}
+
+/* ============================= */
+/* PROGRESS BAR VERTICAL */
+/* ============================= */
+
+.progress-vertical{
+
+height:120px;
+
+width:16px;
+
+background:#ddd;
+
+border-radius:10px;
+
+position:relative;
+
+margin-top:10px;
+
+}
+
+.progress-fill{
+
+position:absolute;
+
+bottom:0;
+
+width:100%;
+
+background:#c56f35;
+
+border-radius:10px;
+
+}
+
+/* ============================= */
+/* RIGHT PANEL */
+/* ============================= */
+
+.panel-right{
+
+padding:20px;
+
+border-left:1px solid rgba(0,0,0,0.1);
+
+overflow:auto;
+
+}
+
+.preferences label{
+
+display:block;
+
+margin-bottom:10px;
+
+}
+
+/* ============================= */
+/* HEATMAP */
+/* ============================= */
+
+#energyHeatmap{
+
+display:flex;
+
+flex-direction:column;
+
+gap:4px;
+
+margin-top:10px;
+
+}
+
+.heat-cell{
+
+height:20px;
+
+border-radius:4px;
+
+background:#ddd;
+
+}
+
+/* ============================= */
+/* STATS */
+/* ============================= */
+
+#statsPanel{
+
+margin-top:10px;
+
+font-size:14px;
+
+}
+
+/* ============================= */
+/* MAP */
+/* ============================= */
+
+#projectMap{
+
+width:100%;
+
+height:400px;
+
+background:rgba(255,255,255,0.3);
+
+border-radius:12px;
+
+}
+
+/* ============================= */
+/* FOOTER */
+/* ============================= */
+
+.action-bar{
+
+height:40px;
+
+display:flex;
+
+justify-content:center;
+
+align-items:center;
+
+gap:20px;
+
+background:rgba(255,255,255,0.3);
+
+border-top:1px solid rgba(0,0,0,0.1);
+
+}
+
+.action-bar button{
+
+padding:6px 12px;
+
+border:none;
+
+border-radius:8px;
+
+background:#c56f35;
+
+color:white;
+
+cursor:pointer;
+
+}
+
+/* ============================= */
+/* MODAL */
+/* ============================= */
+
+.modal-overlay{
+
+position:fixed;
+
+inset:0;
+
+background:rgba(0,0,0,0.4);
+
+}
+
+.modal{
+
+position:fixed;
+
+top:50%;
+left:50%;
+
+transform:translate(-50%,-50%);
+
+background:white;
+
+padding:20px;
+
+border-radius:12px;
+
+width:400px;
+
+box-shadow:0 10px 30px rgba(0,0,0,0.3);
+
+}
+
+.modal-close{
+
+position:absolute;
+
+top:10px;
+right:10px;
+
+cursor:pointer;
+
+}
