@@ -1,95 +1,52 @@
-/* ============================= */
-/* ILLUMINATOR APP */
-/* ============================= */
-
 const App = {
-  currentView: "day",
-  selectedDate: AppDate.todayISO(),
+  currentView: Config.app.defaultView,
+  selectedDate: todayISO(),
   focusProjectId: null,
-  darkMode: false,
-  currentSuggestedTaskId: null,
-  mapCanvas: null,
-  mapCtx: null
+  googleReady: false
 }
 
-/* ============================= */
-/* DATE HELPERS */
-/* ============================= */
-
-const AppDate = {
-  pad(n) {
-    return String(n).padStart(2, "0")
-  },
-
-  todayISO() {
-    const d = new Date()
-    return `${d.getFullYear()}-${this.pad(d.getMonth() + 1)}-${this.pad(d.getDate())}`
-  },
-
-  fromISO(iso) {
-    const [y, m, d] = iso.split("-").map(Number)
-    return new Date(y, m - 1, d)
-  },
-
-  toISO(date) {
-    const d = new Date(date)
-    return `${d.getFullYear()}-${this.pad(d.getMonth() + 1)}-${this.pad(d.getDate())}`
-  },
-
-  addDays(iso, n) {
-    const d = this.fromISO(iso)
-    d.setDate(d.getDate() + n)
-    return this.toISO(d)
-  },
-
-  startOfWeekISO(iso) {
-    const d = this.fromISO(iso)
-    const day = d.getDay()
-    const diff = day === 0 ? -6 : 1 - day
-    d.setDate(d.getDate() + diff)
-    return this.toISO(d)
-  },
-
-  labelDay(iso) {
-    return this.fromISO(iso).toLocaleDateString("fr-FR", {
-      weekday: "long",
-      day: "numeric",
-      month: "long"
-    })
-  },
-
-  labelShort(iso) {
-    return this.fromISO(iso).toLocaleDateString("fr-FR", {
-      day: "2-digit",
-      month: "2-digit"
-    })
-  },
-
-  labelMonth(iso) {
-    return this.fromISO(iso).toLocaleDateString("fr-FR", {
-      month: "long",
-      year: "numeric"
-    })
-  }
+function todayISO() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
 }
 
-/* ============================= */
-/* DOM HELPERS */
-/* ============================= */
-
-function $(selector) {
-  return document.querySelector(selector)
+function fromISO(iso) {
+  const [y, m, d] = iso.split("-").map(Number)
+  return new Date(y, m - 1, d)
 }
 
-function $all(selector) {
-  return Array.from(document.querySelectorAll(selector))
+function toISO(date) {
+  const d = new Date(date)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
 }
 
-function createEl(tag, className = "", html = "") {
-  const el = document.createElement(tag)
-  if (className) el.className = className
-  if (html) el.innerHTML = html
-  return el
+function addDays(iso, n) {
+  const d = fromISO(iso)
+  d.setDate(d.getDate() + n)
+  return toISO(d)
+}
+
+function startOfWeekISO(iso) {
+  const d = fromISO(iso)
+  const day = d.getDay()
+  const diff = day === 0 ? -6 : 1 - day
+  d.setDate(d.getDate() + diff)
+  return toISO(d)
+}
+
+function qs(sel) {
+  return document.querySelector(sel)
+}
+
+function qsa(sel) {
+  return Array.from(document.querySelectorAll(sel))
+}
+
+function el(tag, cls = "", html = "") {
+  const node = document.createElement(tag)
+  if (cls) node.className = cls
+  if (html) node.innerHTML = html
+  return node
 }
 
 function escapeHTML(str) {
@@ -101,235 +58,256 @@ function escapeHTML(str) {
     .replaceAll("'", "&#039;")
 }
 
-/* ============================= */
-/* INIT */
-/* ============================= */
-
 document.addEventListener("DOMContentLoaded", initApp)
 
 function initApp() {
   Engine.load()
-
   Scheduler.requestRender = renderCurrentView
 
-  bootstrapDemoIfNeeded()
-  bindGlobalControls()
-  bindViewButtons()
-  bindFooterButtons()
-  syncUIFromState()
+  bootstrapDemo()
+  bindPanels()
+  bindTabs()
+  bindBottomActions()
+  bindPrefs()
+  bindGoogleButtons()
+  syncPrefsUI()
   renderAll()
 }
 
-/* ============================= */
-/* DEMO / SAFETY */
-/* ============================= */
+function bootstrapDemo() {
+  if (Engine.state.projects.length) return
 
-function bootstrapDemoIfNeeded() {
-  if (!Engine.state.projects.length) {
-    Engine.createProject({
-      name: "Article addictions écrans",
-      deadline: AppDate.addDays(App.selectedDate, 30),
-      fragments: 8,
-      fragmentDuration: 30,
-      priority: 4,
-      weeklyTarget: 3,
-      energyRequired: 2
-    })
+  const p1 = Engine.createProject({
+    name: "Article addiction écrans",
+    deadline: addDays(App.selectedDate, 24),
+    fragments: 8,
+    fragmentDuration: 30,
+    priority: 4,
+    weeklyTarget: 3,
+    energyRequired: 2,
+    color: "#7c4a2d"
+  })
 
-    Engine.createProject({
-      name: "Carnet de stage",
-      deadline: AppDate.addDays(App.selectedDate, 21),
-      fragments: 10,
-      fragmentDuration: 25,
-      priority: 5,
-      weeklyTarget: 4,
-      energyRequired: 2
-    })
+  const p2 = Engine.createProject({
+    name: "Carnet de stage",
+    deadline: addDays(App.selectedDate, 18),
+    fragments: 10,
+    fragmentDuration: 25,
+    priority: 5,
+    weeklyTarget: 4,
+    energyRequired: 2,
+    color: "#9a6343"
+  })
 
-    Engine.createProject({
-      name: "Livre en cours",
-      deadline: AppDate.addDays(App.selectedDate, 45),
-      fragments: 12,
-      fragmentDuration: 20,
-      priority: 2,
-      weeklyTarget: 2,
-      energyRequired: 1
-    })
+  const p3 = Engine.createProject({
+    name: "Batterie",
+    deadline: addDays(App.selectedDate, 60),
+    fragments: 12,
+    fragmentDuration: 20,
+    priority: 2,
+    weeklyTarget: 3,
+    energyRequired: 1,
+    color: "#a67c2d"
+  })
 
-    Engine.createProject({
-      name: "Batterie",
-      deadline: AppDate.addDays(App.selectedDate, 60),
-      fragments: 12,
-      fragmentDuration: 20,
-      priority: 2,
-      weeklyTarget: 3,
-      energyRequired: 1
-    })
-  }
+  const p4 = Engine.createProject({
+    name: "Application",
+    deadline: addDays(App.selectedDate, 40),
+    fragments: 10,
+    fragmentDuration: 35,
+    priority: 4,
+    weeklyTarget: 4,
+    energyRequired: 3,
+    color: "#5a6e8a"
+  })
 
-  if (!Engine.state.scheduledBlocks.length) {
-    Scheduler.generateWeekPlan(new Date())
-  }
-
+  Scheduler.generateWeekPlan(new Date())
   Engine.save()
 }
 
-/* ============================= */
-/* BINDINGS */
-/* ============================= */
+function bindPanels() {
+  qs("#leftPanelToggle").addEventListener("click", () => openPanel("left"))
+  qs("#rightPanelToggle").addEventListener("click", () => openPanel("right"))
+  qs("#leftPanelClose").addEventListener("click", closePanels)
+  qs("#rightPanelClose").addEventListener("click", closePanels)
+  qs("#panelBackdrop").addEventListener("click", closePanels)
 
-function bindGlobalControls() {
-  $("#seasonSelector")?.addEventListener("change", (e) => {
-    const body = document.body
-    body.classList.remove("theme-automne", "theme-printemps", "theme-ete", "theme-hiver")
-    body.classList.add(`theme-${e.target.value}`)
+  qsa("[data-lefttab]").forEach(btn => {
+    btn.addEventListener("click", () => switchSideTab("left", btn.dataset.lefttab))
   })
 
-  $("#darkToggle")?.addEventListener("click", () => {
-    App.darkMode = !App.darkMode
-    document.body.classList.toggle("dark", App.darkMode)
-  })
-
-  $("#focusToggle")?.addEventListener("click", () => {
-    if (App.focusProjectId) {
-      App.focusProjectId = null
-    } else {
-      const first = Engine.state.projects[0]
-      App.focusProjectId = first ? first.id : null
-    }
-    renderAll()
-  })
-
-  $("#aiSuggest")?.addEventListener("click", () => {
-    const suggested = Engine.suggestTask()
-    App.currentSuggestedTaskId = suggested ? suggested.id : null
-    renderRecommendation()
-    if (suggested) {
-      openTaskQuickModal(suggested.id, true)
-    }
-  })
-
-  $("#newProjectButton")?.addEventListener("click", () => {
-    openProjectCreateModal()
-  })
-
-  $("#energyPeak")?.addEventListener("input", () => {
-    renderHeatmap()
-    renderRecommendation()
-  })
-
-  $("#focusDuration")?.addEventListener("change", () => {
-    renderRecommendation()
+  qsa("[data-righttab]").forEach(btn => {
+    btn.addEventListener("click", () => switchSideTab("right", btn.dataset.righttab))
   })
 }
 
-function bindViewButtons() {
-  $all(".view-selector button").forEach(btn => {
+function openPanel(side) {
+  qs("#panelBackdrop").classList.remove("hidden")
+  if (side === "left") qs("#leftPanel").classList.remove("hidden")
+  if (side === "right") qs("#rightPanel").classList.remove("hidden")
+}
+
+function closePanels() {
+  qs("#panelBackdrop").classList.add("hidden")
+  qs("#leftPanel").classList.add("hidden")
+  qs("#rightPanel").classList.add("hidden")
+}
+
+function switchSideTab(side, tab) {
+  qsa(`[data-${side}tab]`).forEach(btn => {
+    btn.classList.toggle("is-active", btn.dataset[`${side}tab`] === tab)
+  })
+
+  qsa(side === "left" ? "#leftPanel .side-page" : "#rightPanel .side-page").forEach(page => {
+    page.classList.remove("is-show")
+  })
+
+  qs(`#${side}-${tab}`)?.classList.add("is-show")
+}
+
+function bindTabs() {
+  qsa(".mode-pill").forEach(btn => {
     btn.addEventListener("click", () => {
       App.currentView = btn.dataset.view
+      qsa(".mode-pill").forEach(b => b.classList.remove("is-active"))
+      btn.classList.add("is-active")
       renderCurrentView()
     })
   })
 }
 
-function bindFooterButtons() {
-  $("#openScheduler")?.addEventListener("click", () => {
-    openSchedulerModal()
+function bindBottomActions() {
+  qs("#openNotesBtn").addEventListener("click", openNotesModal)
+  qs("#openKiffanceBtn").addEventListener("click", openKiffanceModal)
+  qs("#openStatsBtn").addEventListener("click", openStatsModal)
+  qs("#openDetailsBtn").addEventListener("click", openProjectChooserModal)
+  qs("#openListBtn").addEventListener("click", () => openPanel("left"))
+  qs("#openSchedulerBtn").addEventListener("click", openSchedulerModal)
+  qs("#openSuggestionBtn").addEventListener("click", openSuggestionModal)
+
+  qs("#newProjectBtn").addEventListener("click", openProjectCreateModal)
+  qs("#importInboxBtn").addEventListener("click", importInbox)
+  qs("#clearInboxBtn").addEventListener("click", () => { qs("#inboxText").value = "" })
+
+  qs("#generateWeekPlanBtn")?.addEventListener("click", () => {
+    Scheduler.generateWeekPlan(new Date(fromISO(App.selectedDate)))
+    renderAll()
   })
 
-  $("#openStats")?.addEventListener("click", () => {
-    openStatsModal()
+  qs("#newManualBlockBtn")?.addEventListener("click", openManualBlockModal)
+}
+
+function bindPrefs() {
+  qs("#savePrefsBtn").addEventListener("click", () => {
+    Engine.state.preferences.season = qs("#seasonSelect").value
+    Engine.state.preferences.mode = qs("#themeModeSelect").value
+    Engine.state.preferences.focus = qs("#focusModeSelect").value === "on"
+    Engine.state.preferences.weekType = qs("#weekTypeSelect").value
+    Engine.state.preferences.energyPeak = Number(qs("#energyPeakInput").value)
+    Engine.state.preferences.focusDuration = Number(qs("#focusDurationInput").value)
+
+    App.focusProjectId = Engine.state.preferences.focus ? (App.focusProjectId || Engine.state.projects[0]?.id || null) : null
+
+    applyPrefsToBody()
+    Engine.save()
+    renderAll()
+  })
+}
+
+function bindGoogleButtons() {
+  qs("#connectGoogleBtn").addEventListener("click", async () => {
+    const ok = await GoogleCalendarBridge.init()
+    App.googleReady = ok
+    qs("#googleStatus").textContent = ok ? "Google Calendar prêt." : "Configuration Google incomplète."
   })
 
-  $("#openSettings")?.addEventListener("click", () => {
-    openSettingsModal()
+  qs("#importGoogleWeekBtn").addEventListener("click", async () => {
+    if (!App.googleReady) {
+      qs("#googleStatus").textContent = "Connecte d'abord Google Calendar."
+      return
+    }
+
+    const start = startOfWeekISO(App.selectedDate)
+    const end = addDays(start, 7)
+    const events = await GoogleCalendarBridge.listWeekEvents(start, end)
+
+    if (!events.length) {
+      qs("#googleStatus").textContent = "Aucun événement importé."
+      return
+    }
+
+    events.forEach(event => {
+      if (!event.start || !event.end || !event.start.includes("T")) return
+      const startDate = new Date(event.start)
+      const endDate = new Date(event.end)
+      const date = toISO(startDate)
+      const duration = Math.max(15, Math.round((endDate - startDate) / (1000 * 60)))
+      Scheduler.createManualBlock({
+        date,
+        startHour: startDate.getHours(),
+        startMinute: startDate.getMinutes(),
+        duration,
+        title: `[Agenda] ${event.title}`,
+        projectId: null
+      })
+    })
+
+    qs("#googleStatus").textContent = `${events.length} événement(s) importé(s).`
+    renderAll()
   })
 }
 
-function syncUIFromState() {
-  $("#weekType") && ($("#weekType").value = "work")
-  $("#energyPeak") && ($("#energyPeak").value = "21")
-  $("#focusDuration") && ($("#focusDuration").value = "40")
+function syncPrefsUI() {
+  qs("#seasonSelect").value = Engine.state.preferences.season
+  qs("#themeModeSelect").value = Engine.state.preferences.mode
+  qs("#focusModeSelect").value = Engine.state.preferences.focus ? "on" : "off"
+  qs("#weekTypeSelect").value = Engine.state.preferences.weekType
+  qs("#energyPeakInput").value = Engine.state.preferences.energyPeak
+  qs("#focusDurationInput").value = Engine.state.preferences.focusDuration
+  applyPrefsToBody()
 }
 
-/* ============================= */
-/* RENDER MASTER */
-/* ============================= */
-
-function renderAll() {
-  renderProjectList()
-  renderActiveTasks()
-  renderCurrentView()
-  renderHeatmap()
-  renderRecommendation()
-  renderStats()
+function applyPrefsToBody() {
+  document.body.classList.remove("theme-printemps", "theme-ete", "theme-automne", "theme-hiver")
+  document.body.classList.add(`theme-${Engine.state.preferences.season}`)
+  document.body.classList.toggle("mode-dark", Engine.state.preferences.mode === "dark")
 }
-
-function renderCurrentView() {
-  hideAllViews()
-
-  switch (App.currentView) {
-    case "day":
-      $("#dashboardView")?.classList.remove("hidden")
-      renderDayView()
-      break
-    case "week":
-      $("#weekView")?.classList.remove("hidden")
-      renderWeekView()
-      break
-    case "month":
-      $("#monthView")?.classList.remove("hidden")
-      renderMonthView()
-      break
-    case "projects":
-      $("#projectsView")?.classList.remove("hidden")
-      renderProjectsView()
-      break
-    case "timeline":
-      $("#timelineView")?.classList.remove("hidden")
-      renderTimelineView()
-      break
-    case "map":
-      $("#mapView")?.classList.remove("hidden")
-      renderMapView()
-      break
-    default:
-      $("#dashboardView")?.classList.remove("hidden")
-      renderDayView()
-  }
-}
-
-function hideAllViews() {
-  const ids = [
-    "#dashboardView",
-    "#weekView",
-    "#monthView",
-    "#projectsView",
-    "#timelineView",
-    "#mapView"
-  ]
-  ids.forEach(id => $(id)?.classList.add("hidden"))
-}
-
-/* ============================= */
-/* LEFT PANEL */
-/* ============================= */
 
 function visibleProjects() {
   if (!App.focusProjectId) return Engine.state.projects
   return Engine.state.projects.filter(p => p.id === App.focusProjectId)
 }
 
+function renderAll() {
+  renderHeaderStatus()
+  renderProjectList()
+  renderTaskList()
+  renderHeatmap()
+  renderStats()
+  renderCurrentView()
+}
+
+function renderHeaderStatus() {
+  qs("#selectedDateLabel").textContent = fromISO(App.selectedDate).toLocaleDateString("fr-FR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long"
+  })
+
+  const start = startOfWeekISO(App.selectedDate)
+  const end = addDays(start, 6)
+  qs("#weekLabel").textContent = `${fromISO(start).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })} → ${fromISO(end).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })}`
+}
+
 function renderProjectList() {
-  const root = $("#projectList")
-  if (!root) return
+  const root = qs("#leftProjectList")
   root.innerHTML = ""
 
   visibleProjects().forEach(project => {
-    const card = createEl("div", "project-list-item")
+    const card = el("div", "project-list-item")
     card.innerHTML = `
       <strong>${escapeHTML(project.name)}</strong>
-      <div>${project.progress}%</div>
+      <div class="small-muted">${project.progress}%</div>
     `
     card.addEventListener("click", () => {
       App.focusProjectId = project.id
@@ -340,434 +318,326 @@ function renderProjectList() {
   })
 }
 
-function renderActiveTasks() {
-  const root = $("#activeTasks")
-  if (!root) return
+function renderTaskList() {
+  const root = qs("#leftTaskList")
   root.innerHTML = ""
 
-  const pending = Engine.state.tasks.filter(t => {
+  const tasks = Engine.state.tasks.filter(t => {
     if (t.status === "done") return false
     if (!App.focusProjectId) return true
     return t.projectId === App.focusProjectId
-  }).slice(0, 8)
+  }).slice(0, 10)
 
-  pending.forEach(task => {
-    const project = Engine.state.projects.find(p => p.id === task.projectId)
-    const item = createEl("div", "active-task-item")
+  tasks.forEach(task => {
+    const project = Engine.getProject(task.projectId)
+    const item = el("div", "active-task-item")
     item.innerHTML = `
       <div><strong>${escapeHTML(task.title)}</strong></div>
-      <div>${escapeHTML(project?.name || "Projet")} · ${task.duration} min</div>
+      <div class="small-muted">${escapeHTML(project?.name || "Projet")} · ${task.duration} min</div>
     `
-    item.addEventListener("click", () => openTaskQuickModal(task.id))
+    item.addEventListener("click", () => openTaskQuickModal(task.id, true))
     root.appendChild(item)
   })
 }
 
-/* ============================= */
-/* DAY VIEW */
-/* ============================= */
+function renderCurrentView() {
+  qsa(".view").forEach(v => v.classList.remove("is-show"))
+  qs(`#view-${App.currentView}`)?.classList.add("is-show")
+
+  if (App.currentView === "day") renderDayView()
+  if (App.currentView === "week") renderWeekView()
+  if (App.currentView === "month") renderMonthView()
+  if (App.currentView === "projects") renderProjectsView()
+  if (App.currentView === "timeline") renderTimelineView()
+  if (App.currentView === "map") renderMapView()
+}
 
 function renderDayView() {
-  const titleRoot = $("#todayProgress")
-  if (titleRoot) {
-    const blocks = Scheduler.getBlocksForDate(App.selectedDate)
-    const doneCount = blocks.length
-    titleRoot.innerHTML = `
-      <span>${AppDate.labelDay(App.selectedDate)}</span>
-      <span>${doneCount} bloc(s)</span>
-    `
-  }
-
-  renderMiniDayTimeline("#todayTimeline", App.selectedDate)
-}
-
-function renderMiniDayTimeline(targetSelector, dateISO) {
-  const root = $(targetSelector)
-  if (!root) return
+  const root = qs("#dayBoard")
   root.innerHTML = ""
 
-  const { rows, blocks } = Scheduler.getTimelineRows(dateISO, 6, 23)
+  const buckets = [
+    { label: "08h — 09h", from: 8 * 60, to: 9 * 60 },
+    { label: "Travail journée", from: 9 * 60, to: 18 * 60 },
+    { label: "20h — 21h30", from: 20 * 60, to: 21 * 60 + 30 },
+    { label: "21h30 — 23h", from: 21 * 60 + 30, to: 23 * 60 }
+  ]
 
-  rows.forEach(row => {
-    const slot = createEl("div", "timeline-slot")
-    slot.dataset.hour = row.hour
-    slot.dataset.minute = row.minute
-    slot.innerHTML = `<span>${row.label}</span>`
+  const blocks = Scheduler.getBlocksForDate(App.selectedDate)
 
-    const matching = blocks.filter(block => {
+  buckets.forEach(bucket => {
+    const cell = el("div", "day-cell")
+    const stack = el("div", "day-cell__stack")
+
+    const relevant = blocks.filter(block => {
       const start = Scheduler.toMinutes(block.startHour, block.startMinute)
-      return start === row.minuteValue
+      return start >= bucket.from && start < bucket.to
     })
 
-    matching.forEach(block => {
-      const blockEl = createEl("div", "timeline-task")
-      blockEl.style.background = block.color || "#c56f35"
-      blockEl.innerHTML = `
-        <div class="timeline-block__body">
-          ${escapeHTML(block.taskTitle)}
-        </div>
-        <div class="timeline-block__resize">⋮</div>
-      `
-      blockEl.dataset.blockId = block.id
-      Scheduler.attachBlockInteractions(blockEl, block)
-      blockEl.addEventListener("dblclick", () => openBlockEditModal(block.id))
-      slot.appendChild(blockEl)
+    relevant.forEach(block => {
+      const task = Engine.getTask(block.taskId)
+      const project = Engine.getProject(block.projectId)
+      const frag = el("div", "day-fragment")
+      frag.style.background = project?.color || Config.projectDefaults.color
+      frag.innerHTML = `${String(block.startHour).padStart(2, "0")}:${String(block.startMinute).padStart(2, "0")} · ${escapeHTML(task?.title || "Bloc")}`
+      frag.addEventListener("click", () => openBlockEditModal(block.id))
+      stack.appendChild(frag)
     })
 
-    root.appendChild(slot)
+    if (!relevant.length) {
+      stack.innerHTML = `<div class="small-muted">Libre</div>`
+    }
+
+    cell.innerHTML = `
+      <div class="day-cell__head">
+        <span>${bucket.label}</span>
+        <span>${relevant.length}</span>
+      </div>
+    `
+    cell.appendChild(stack)
+    root.appendChild(cell)
   })
-}
 
-/* ============================= */
-/* WEEK VIEW */
-/* ============================= */
+  qs("#daySummaryCompact").textContent = `${blocks.length} bloc(s) aujourd’hui`
+}
 
 function renderWeekView() {
-  const root = $("#weekGrid")
-  if (!root) return
+  const root = qs("#weekBoard")
   root.innerHTML = ""
 
-  const start = AppDate.startOfWeekISO(App.selectedDate)
+  const start = startOfWeekISO(App.selectedDate)
 
   for (let i = 0; i < 7; i++) {
-    const date = AppDate.addDays(start, i)
-    const day = createEl("div", "week-day")
-    day.innerHTML = `
-      <h4>${AppDate.labelShort(date)}</h4>
-      <div class="week-day__inner" id="week-day-${date}"></div>
-    `
-    root.appendChild(day)
-    renderWeekDayMini(date, `#week-day-${date}`)
+    const iso = addDays(start, i)
+    const blocks = Scheduler.getBlocksForDate(iso)
+
+    const dayCard = el("div", "week-day-card")
+    const stack = el("div", "week-day-card__stack")
+    dayCard.innerHTML = `<strong>${fromISO(iso).toLocaleDateString("fr-FR", { weekday: "short", day: "2-digit" })}</strong>`
+
+    if (!blocks.length) {
+      stack.innerHTML = `<div class="small-muted">Libre</div>`
+    } else {
+      blocks.forEach(block => {
+        const task = Engine.getTask(block.taskId)
+        const project = Engine.getProject(block.projectId)
+        const chip = el("div", "week-chip", `${String(block.startHour).padStart(2, "0")}:${String(block.startMinute).padStart(2, "0")} · ${escapeHTML(task?.title || "Bloc")}`)
+        chip.style.background = project?.color || Config.projectDefaults.color
+        chip.addEventListener("click", () => openBlockEditModal(block.id))
+        stack.appendChild(chip)
+      })
+    }
+
+    dayCard.appendChild(stack)
+    root.appendChild(dayCard)
   }
 }
-
-function renderWeekDayMini(dateISO, targetSelector) {
-  const root = $(targetSelector)
-  if (!root) return
-  root.innerHTML = ""
-
-  const blocks = Scheduler.getBlocksForDate(dateISO)
-
-  if (!blocks.length) {
-    root.innerHTML = `<small>Libre</small>`
-    return
-  }
-
-  blocks.forEach(block => {
-    const project = Scheduler.getProject(block.projectId)
-    const task = Scheduler.getTask(block.taskId)
-    const tag = createEl("div", "week-task-chip")
-    tag.style.background = project?.color || "#c56f35"
-    tag.innerHTML = `${Scheduler.pad(block.startHour)}:${Scheduler.pad(block.startMinute)} · ${escapeHTML(task?.title || "Tâche")}`
-    tag.addEventListener("click", () => openBlockEditModal(block.id))
-    root.appendChild(tag)
-  })
-}
-
-/* ============================= */
-/* MONTH VIEW */
-/* ============================= */
 
 function renderMonthView() {
-  const root = $("#monthGrid")
-  if (!root) return
+  const root = qs("#monthBoard")
   root.innerHTML = ""
 
-  const date = AppDate.fromISO(App.selectedDate)
+  const date = fromISO(App.selectedDate)
   const year = date.getFullYear()
   const month = date.getMonth()
-  const first = new Date(year, month, 1)
-  const last = new Date(year, month + 1, 0)
+  const lastDay = new Date(year, month + 1, 0).getDate()
 
-  for (let d = 1; d <= last.getDate(); d++) {
-    const iso = AppDate.toISO(new Date(year, month, d))
-    const day = createEl("div", "month-day")
+  for (let d = 1; d <= lastDay; d++) {
+    const iso = toISO(new Date(year, month, d))
     const blocks = Scheduler.getBlocksForDate(iso)
-    day.innerHTML = `
+    const cell = el("div", "month-cell")
+    cell.innerHTML = `
       <div><strong>${d}</strong></div>
-      <div>${blocks.length} bloc(s)</div>
+      <div class="month-cell__meta">${blocks.length} bloc(s)</div>
     `
-    day.addEventListener("click", () => {
+    cell.addEventListener("click", () => {
       App.selectedDate = iso
       App.currentView = "day"
-      renderCurrentView()
+      qsa(".mode-pill").forEach(b => b.classList.toggle("is-active", b.dataset.view === "day"))
+      renderAll()
     })
-    root.appendChild(day)
+    root.appendChild(cell)
   }
 }
 
-/* ============================= */
-/* PROJECTS VIEW */
-/* ============================= */
-
 function renderProjectsView() {
-  const root = $("#projectCards")
-  if (!root) return
+  const root = qs("#projectsBoard")
   root.innerHTML = ""
 
   visibleProjects().forEach(project => {
-    const card = createEl("div", "project-card")
+    const card = el("div", "project-card")
     card.innerHTML = `
-      <h3>${escapeHTML(project.name)}</h3>
+      <div class="project-card__head">
+        <strong>${escapeHTML(project.name)}</strong>
+        <span>${project.progress}%</span>
+      </div>
       <div class="progress-vertical">
         <div class="progress-fill" style="height:${project.progress}%"></div>
       </div>
-      <p>${project.progress}%</p>
+      <div class="small-muted">Fragments : ${project.fragments}</div>
+      <div class="small-muted">Fréquence : ${project.weeklyTarget} / semaine</div>
     `
     card.addEventListener("click", () => openProjectDetailModal(project.id))
     root.appendChild(card)
   })
 }
 
-/* ============================= */
-/* TIMELINE VIEW */
-/* ============================= */
-
 function renderTimelineView() {
-  const root = $("#timelineContainer")
-  if (!root) return
+  const root = qs("#timelineContainer")
+  root.innerHTML = `<div class="timeline-grid" id="timelineGrid"></div>`
 
-  root.innerHTML = `
-    <div id="timelineVertical"></div>
-  `
-
-  const timeline = $("#timelineVertical")
-  if (!timeline) return
-
-  timeline.dataset.pxPer15 = "20"
-
-  const { rows, blocks } = Scheduler.getTimelineRows(App.selectedDate, 6, 23)
+  const grid = qs("#timelineGrid")
+  const { rows, blocks } = Scheduler.getTimelineRows(App.selectedDate)
 
   rows.forEach(row => {
-    const slot = createEl("div", "timeline-slot")
-    slot.dataset.hour = row.hour
-    slot.dataset.minute = row.minute
-    slot.innerHTML = `<span>${row.label}</span>`
-
-    timeline.appendChild(slot)
+    const line = el("div", "timeline-row")
+    line.innerHTML = `<div class="timeline-row__label">${row.label}</div>`
+    grid.appendChild(line)
   })
 
+  grid.style.minHeight = `${rows.length * Config.ui.timeline.pxPer15Min + 24}px`
+
   blocks.forEach(block => {
-    const task = Scheduler.getTask(block.taskId)
-    const project = Scheduler.getProject(block.projectId)
+    const task = Engine.getTask(block.taskId)
+    const project = Engine.getProject(block.projectId)
+    const startMin = Scheduler.toMinutes(block.startHour, block.startMinute)
+    const offset = startMin - Scheduler.toMinutes(Config.ui.timeline.startHour, 0)
 
-    const blockEl = createEl("div", "timeline-task timeline-task--floating")
-    blockEl.dataset.blockId = block.id
-    blockEl.style.position = "absolute"
-    blockEl.style.left = "100px"
-    blockEl.style.right = "12px"
-    blockEl.style.top = `${(Scheduler.toMinutes(block.startHour, block.startMinute) - 360) / 15 * 20}px`
-    blockEl.style.height = `${(block.duration / 15) * 20 - 4}px`
-    blockEl.style.background = project?.color || "#c56f35"
-
+    const blockEl = el("div", "timeline-block")
+    blockEl.style.top = `${(offset / 15) * Config.ui.timeline.pxPer15Min}px`
+    blockEl.style.height = `${(block.duration / 15) * Config.ui.timeline.pxPer15Min - 4}px`
+    blockEl.style.background = project?.color || Config.projectDefaults.color
     blockEl.innerHTML = `
       <div class="timeline-block__body">
-        <strong>${escapeHTML(task?.title || "Tâche")}</strong><br>
-        <small>${escapeHTML(project?.name || "")}</small>
+        <strong>${escapeHTML(task?.title || "Bloc")}</strong><br>
+        <small>${escapeHTML(project?.name || "Projet")}</small>
       </div>
       <div class="timeline-block__resize">⋮</div>
     `
 
     Scheduler.attachBlockInteractions(blockEl, block)
     blockEl.addEventListener("dblclick", () => openBlockEditModal(block.id))
-
-    timeline.appendChild(blockEl)
+    grid.appendChild(blockEl)
   })
-
-  timeline.style.position = "relative"
-  timeline.style.minHeight = `${rows.length * 20 + 40}px`
 }
-
-/* ============================= */
-/* MAP VIEW */
-/* ============================= */
 
 function renderMapView() {
-  const canvas = $("#projectMap")
-  if (!canvas) return
+  const root = qs("#mapBoard")
+  root.innerHTML = `<div class="realm-map" id="realmMap"></div>`
 
-  App.mapCanvas = canvas
-  App.mapCtx = canvas.getContext("2d")
-
-  const rect = canvas.getBoundingClientRect()
-  canvas.width = Math.max(600, rect.width || 800)
-  canvas.height = 420
-
-  const ctx = App.mapCtx
-  ctx.clearRect(0, 0, canvas.width, canvas.height)
-
+  const map = qs("#realmMap")
   const projects = visibleProjects()
-  const centerX = canvas.width / 2
-  const centerY = canvas.height / 2
+
+  const centerX = 460
+  const centerY = 180
   const radius = 140
 
-  projects.forEach((project, index) => {
-    const angle = (Math.PI * 2 / Math.max(projects.length, 1)) * index
-    const x = centerX + Math.cos(angle) * radius
-    const y = centerY + Math.sin(angle) * radius
+  const positions = projects.map((project, i) => {
+    const angle = (Math.PI * 2 / Math.max(projects.length, 1)) * i
+    return {
+      project,
+      x: centerX + Math.cos(angle) * radius,
+      y: centerY + Math.sin(angle) * radius
+    }
+  })
 
-    ctx.fillStyle = project.color || "#c56f35"
-    ctx.beginPath()
-    ctx.arc(x, y, 34, 0, Math.PI * 2)
-    ctx.fill()
+  positions.forEach((p, i) => {
+    const next = positions[(i + 1) % positions.length]
+    if (!next) return
 
-    ctx.fillStyle = "#ffffff"
-    ctx.font = "12px Yusei Magic"
-    ctx.textAlign = "center"
-    ctx.fillText(project.name.slice(0, 12), x, y + 4)
+    const dx = next.x - p.x
+    const dy = next.y - p.y
+    const len = Math.sqrt(dx * dx + dy * dy)
+    const angle = Math.atan2(dy, dx) * 180 / Math.PI
 
-    const linkedTasks = Engine.state.tasks.filter(t => t.projectId === project.id).slice(0, 4)
-    linkedTasks.forEach((task, i) => {
-      const tx = x + (i % 2 === 0 ? -70 : 70)
-      const ty = y + (i * 22) - 40
+    const link = el("div", "realm-link")
+    link.style.left = `${p.x}px`
+    link.style.top = `${p.y}px`
+    link.style.width = `${len}px`
+    link.style.transform = `rotate(${angle}deg)`
+    map.appendChild(link)
+  })
 
-      ctx.strokeStyle = "rgba(0,0,0,0.25)"
-      ctx.beginPath()
-      ctx.moveTo(x, y)
-      ctx.lineTo(tx, ty)
-      ctx.stroke()
-
-      ctx.fillStyle = "rgba(255,255,255,0.85)"
-      ctx.fillRect(tx - 50, ty - 12, 100, 22)
-      ctx.fillStyle = "#222"
-      ctx.fillText(task.title.slice(0, 16), tx, ty + 4)
-    })
+  positions.forEach(p => {
+    const node = el("div", "realm-node")
+    node.style.left = `${p.x - 60}px`
+    node.style.top = `${p.y - 20}px`
+    node.style.background = p.project.color || Config.projectDefaults.color
+    node.innerHTML = `${escapeHTML(p.project.name)}<br>${p.project.progress}%`
+    node.addEventListener("click", () => openProjectDetailModal(p.project.id))
+    map.appendChild(node)
   })
 }
 
-/* ============================= */
-/* HEATMAP */
-/* ============================= */
-
 function renderHeatmap() {
-  const root = $("#energyHeatmap")
-  if (!root) return
+  const root = qs("#energyHeatmap")
   root.innerHTML = ""
 
   for (let hour = 6; hour <= 23; hour++) {
     const energy = Engine.estimateEnergy(hour)
-    const cell = createEl("div", "heat-cell")
-    const alpha = Math.min(1, Math.max(0.1, energy / 10))
-    cell.style.background = `rgba(200,100,40,${alpha})`
-    cell.title = `${hour}h · énergie ${energy.toFixed(1)}`
+    const cell = el("div", "heat-cell")
+    cell.style.background = `rgba(124,74,45,${Math.max(0.12, energy / 10)})`
+    cell.title = `${hour}h · énergie ${energy}`
     root.appendChild(cell)
   }
 }
 
-/* ============================= */
-/* RECOMMENDATION */
-/* ============================= */
-
-function renderRecommendation() {
-  const root = $("#recommendation")
-  if (!root) return
-
-  const suggested = Engine.suggestTask()
-  const randomAlt = Engine.randomTask()
-
-  if (!suggested) {
-    root.innerHTML = `<p>Rien à proposer.</p>`
-    return
-  }
-
-  App.currentSuggestedTaskId = suggested.id
-  const project = Engine.state.projects.find(p => p.id === suggested.projectId)
-
-  root.innerHTML = `
-    <div class="suggestion-box">
-      <strong>Meilleure action</strong><br>
-      ${escapeHTML(suggested.title)}<br>
-      <small>${escapeHTML(project?.name || "")} · ${suggested.duration} min</small>
-    </div>
-    <div style="margin-top:10px;">
-      <button id="acceptSuggestionBtn">Planifier</button>
-      <button id="randomSuggestionBtn">Aléatoire</button>
-    </div>
-  `
-
-  $("#acceptSuggestionBtn")?.addEventListener("click", () => {
-    openTaskQuickModal(suggested.id, true)
-  })
-
-  $("#randomSuggestionBtn")?.addEventListener("click", () => {
-    if (!randomAlt) return
-    openTaskQuickModal(randomAlt.id, true)
-  })
-}
-
-/* ============================= */
-/* STATS */
-/* ============================= */
-
 function renderStats() {
-  const root = $("#statsPanel")
-  if (!root) return
-
   const stats = Engine.getStats()
+  const root = qs("#statsPanel")
   root.innerHTML = `
-    <div>Estimé : ${stats.estimated} min</div>
-    <div>Réel : ${stats.real} min</div>
-    <div>Écart : ${stats.real - stats.estimated} min</div>
-    <div>Projets : ${Engine.state.projects.length}</div>
-    <div>Fragments : ${Engine.state.tasks.length}</div>
+    <div class="stat-card">Estimé : ${stats.estimated} min</div>
+    <div class="stat-card">Réel : ${stats.real} min</div>
+    <div class="stat-card">Écart : ${stats.delta} min</div>
+    <div class="stat-card">Projets : ${stats.projects}</div>
+    <div class="stat-card">Fragments : ${stats.tasks}</div>
+    <div class="stat-card">Terminés : ${stats.doneTasks}</div>
   `
 }
 
-/* ============================= */
-/* MODALS */
-/* ============================= */
+function openModal(html, bindFn) {
+  const layer = qs("#modalLayer")
+  layer.innerHTML = `
+    <div class="modal-overlay" id="modalOverlay"></div>
+    <div class="modal">
+      <button class="modal-close" id="modalClose">×</button>
+      ${html}
+    </div>
+  `
+
+  qs("#modalOverlay").addEventListener("click", closeModal)
+  qs("#modalClose").addEventListener("click", closeModal)
+  if (bindFn) bindFn()
+}
 
 function closeModal() {
-  const root = $("#modalLayer")
-  if (root) root.innerHTML = ""
-}
-
-function openModal(contentHTML, bindAfter = null) {
-  const root = $("#modalLayer")
-  if (!root) return
-
-  root.innerHTML = `
-    <div class="modal-overlay" id="globalModalOverlay"></div>
-    <div class="modal">
-      <button class="modal-close" id="globalModalClose">×</button>
-      ${contentHTML}
-    </div>
-  `
-
-  $("#globalModalOverlay")?.addEventListener("click", closeModal)
-  $("#globalModalClose")?.addEventListener("click", closeModal)
-
-  if (typeof bindAfter === "function") {
-    bindAfter()
-  }
+  qs("#modalLayer").innerHTML = ""
 }
 
 function openProjectCreateModal() {
   openModal(`
     <h2>Nouveau projet</h2>
-    <label>Nom<br><input id="newProjName"></label><br><br>
-    <label>Deadline<br><input id="newProjDeadline" type="date" value="${AppDate.addDays(App.selectedDate, 30)}"></label><br><br>
-    <label>Fragments<br><input id="newProjFragments" type="number" value="8"></label><br><br>
-    <label>Durée fragment (min)<br><input id="newProjDuration" type="number" value="30"></label><br><br>
-    <label>Priorité<br><input id="newProjPriority" type="number" value="3" min="1" max="5"></label><br><br>
-    <label>Fréquence / semaine<br><input id="newProjWeekly" type="number" value="3" min="1" max="7"></label><br><br>
-    <label>Énergie requise<br><input id="newProjEnergy" type="number" value="2" min="1" max="5"></label><br><br>
-    <label>Couleur<br><input id="newProjColor" type="color" value="#c56f35"></label><br><br>
-    <button id="saveProjectBtn">Créer</button>
+    <label>Nom<br><input id="projName"></label><br><br>
+    <label>Deadline<br><input id="projDeadline" type="date" value="${addDays(App.selectedDate, 30)}"></label><br><br>
+    <label>Fragments<br><input id="projFragments" type="number" value="8"></label><br><br>
+    <label>Durée fragment<br><input id="projDuration" type="number" value="30"></label><br><br>
+    <label>Priorité<br><input id="projPriority" type="number" value="3" min="1" max="5"></label><br><br>
+    <label>Fréquence / semaine<br><input id="projWeekly" type="number" value="3" min="1" max="7"></label><br><br>
+    <label>Énergie requise<br><input id="projEnergy" type="number" value="2" min="1" max="5"></label><br><br>
+    <label>Couleur<br><input id="projColor" type="color" value="${Config.projectDefaults.color}"></label><br><br>
+    <button id="saveProjBtn" class="action-btn action-btn--accent">Créer</button>
   `, () => {
-    $("#saveProjectBtn")?.addEventListener("click", () => {
-      const project = Engine.createProject({
-        name: $("#newProjName").value.trim() || "Projet",
-        deadline: $("#newProjDeadline").value,
-        fragments: Number($("#newProjFragments").value || 8),
-        fragmentDuration: Number($("#newProjDuration").value || 30),
-        priority: Number($("#newProjPriority").value || 3),
-        weeklyTarget: Number($("#newProjWeekly").value || 3),
-        energyRequired: Number($("#newProjEnergy").value || 2)
+    qs("#saveProjBtn").addEventListener("click", () => {
+      Engine.createProject({
+        name: qs("#projName").value.trim() || "Projet",
+        deadline: qs("#projDeadline").value,
+        fragments: Number(qs("#projFragments").value || 8),
+        fragmentDuration: Number(qs("#projDuration").value || 30),
+        priority: Number(qs("#projPriority").value || 3),
+        weeklyTarget: Number(qs("#projWeekly").value || 3),
+        energyRequired: Number(qs("#projEnergy").value || 2),
+        color: qs("#projColor").value || Config.projectDefaults.color
       })
-
-      project.color = $("#newProjColor").value || "#c56f35"
-      Engine.save()
       closeModal()
       renderAll()
     })
@@ -775,85 +645,94 @@ function openProjectCreateModal() {
 }
 
 function openProjectDetailModal(projectId) {
-  const project = Engine.state.projects.find(p => p.id === projectId)
+  const project = Engine.getProject(projectId)
   if (!project) return
 
-  const tasks = Engine.state.tasks.filter(t => t.projectId === projectId)
+  const tasks = Engine.getTasksForProject(projectId)
 
   openModal(`
     <h2>${escapeHTML(project.name)}</h2>
     <p>Progression : ${project.progress}%</p>
-    <p>Deadline : ${escapeHTML(project.deadline)}</p>
+    <p>Deadline : ${project.deadline}</p>
     <p>Fragments : ${project.fragments}</p>
-    <p>Durée moyenne : ${project.fragmentDuration} min</p>
+    <p>Durée : ${project.fragmentDuration} min</p>
+    <p>Fréquence : ${project.weeklyTarget} / semaine</p>
     <hr>
     <h3>Fragments</h3>
-    <div id="projectTaskList">
-      ${tasks.map(t => `
-        <div class="project-task-row" data-task-id="${t.id}">
-          ${escapeHTML(t.title)} · ${t.duration} min · ${t.status}
-        </div>
-      `).join("")}
+    <div id="projectTasksModal">
+      ${tasks.map(t => `<div class="project-task-row" data-task-id="${t.id}">${escapeHTML(t.title)} · ${t.duration} min · ${t.status}</div>`).join("")}
     </div>
     <hr>
-    <button id="planProjectBtn">Planifier semaine</button>
+    <button id="focusProjectBtn" class="action-btn">Focus</button>
+    <button id="planProjectWeekBtn" class="action-btn action-btn--accent">Planifier</button>
   `, () => {
-    $("#planProjectBtn")?.addEventListener("click", () => {
-      Scheduler.generateWeekPlan(new Date(AppDate.fromISO(App.selectedDate)))
+    qsa("#projectTasksModal .project-task-row").forEach(row => {
+      row.addEventListener("click", () => openTaskQuickModal(row.dataset.taskId, true))
+    })
+
+    qs("#focusProjectBtn").addEventListener("click", () => {
+      App.focusProjectId = project.id
+      Engine.state.preferences.focus = true
+      qs("#focusModeSelect").value = "on"
       closeModal()
       renderAll()
     })
 
-    $all(".project-task-row").forEach(row => {
-      row.addEventListener("click", () => {
-        openTaskQuickModal(row.dataset.taskId)
+    qs("#planProjectWeekBtn").addEventListener("click", () => {
+      const pending = Engine.getTasksForProject(project.id).filter(t => t.status !== "done")
+      const monday = startOfWeekISO(App.selectedDate)
+      const days = Array.from({ length: 7 }, (_, i) => addDays(monday, i))
+
+      pending.forEach(task => {
+        if (Engine.state.scheduledBlocks.some(b => b.taskId === task.id)) return
+        for (const day of days) {
+          const block = Scheduler.scheduleTask(task, fromISO(day))
+          if (block) break
+        }
       })
+
+      closeModal()
+      renderAll()
     })
   })
 }
 
 function openTaskQuickModal(taskId, withSchedule = false) {
-  const task = Engine.state.tasks.find(t => t.id === taskId)
+  const task = Engine.getTask(taskId)
   if (!task) return
-
-  const project = Engine.state.projects.find(p => p.id === task.projectId)
+  const project = Engine.getProject(task.projectId)
 
   openModal(`
     <h2>${escapeHTML(task.title)}</h2>
-    <p>${escapeHTML(project?.name || "")}</p>
+    <p>${escapeHTML(project?.name || "Projet")}</p>
     <p>Durée : ${task.duration} min</p>
     <p>Énergie : ${task.energy}</p>
     ${withSchedule ? `
       <hr>
-      <label>Date<br><input id="quickTaskDate" type="date" value="${App.selectedDate}"></label><br><br>
-      <label>Heure<br><input id="quickTaskTime" type="time" value="20:00"></label><br><br>
-      <button id="scheduleTaskBtn">Ajouter au planning</button>
+      <label>Date<br><input id="taskDateInput" type="date" value="${App.selectedDate}"></label><br><br>
+      <label>Heure<br><input id="taskTimeInput" type="time" value="20:00"></label><br><br>
+      <button id="scheduleTaskBtn" class="action-btn action-btn--accent">Planifier</button>
+      <button id="completeTaskBtn" class="action-btn">Terminer</button>
     ` : `
-      <button id="markDoneBtn">Marquer fait</button>
+      <button id="completeTaskBtn" class="action-btn action-btn--accent">Terminer</button>
     `}
   `, () => {
-    $("#markDoneBtn")?.addEventListener("click", () => {
+    qs("#completeTaskBtn")?.addEventListener("click", () => {
       Engine.completeTask(task.id, task.duration)
-      Engine.learnEnergyPatterns()
-      Engine.save()
       closeModal()
       renderAll()
     })
 
-    $("#scheduleTaskBtn")?.addEventListener("click", () => {
-      const date = $("#quickTaskDate").value
-      const [h, m] = $("#quickTaskTime").value.split(":").map(Number)
-
+    qs("#scheduleTaskBtn")?.addEventListener("click", () => {
+      const [h, m] = qs("#taskTimeInput").value.split(":").map(Number)
       Scheduler.createBlock({
         taskId: task.id,
         projectId: task.projectId,
-        date,
+        date: qs("#taskDateInput").value,
         startHour: h,
         startMinute: m,
         duration: task.duration
       })
-
-      Engine.save()
       closeModal()
       renderAll()
     })
@@ -864,32 +743,32 @@ function openBlockEditModal(blockId) {
   const block = Scheduler.getBlockById(blockId)
   if (!block) return
 
-  const task = Scheduler.getTask(block.taskId)
-  const project = Scheduler.getProject(block.projectId)
+  const task = Engine.getTask(block.taskId)
+  const project = Engine.getProject(block.projectId)
 
   openModal(`
     <h2>Bloc</h2>
-    <p>${escapeHTML(task?.title || "Tâche")}</p>
+    <p>${escapeHTML(task?.title || "Bloc")}</p>
     <p>${escapeHTML(project?.name || "Projet")}</p>
-    <label>Date<br><input id="editBlockDate" type="date" value="${block.date}"></label><br><br>
-    <label>Heure<br><input id="editBlockTime" type="time" value="${Scheduler.pad(block.startHour)}:${Scheduler.pad(block.startMinute)}"></label><br><br>
-    <label>Durée<br><input id="editBlockDuration" type="number" value="${block.duration}"></label><br><br>
-    <button id="saveBlockBtn">Sauver</button>
-    <button id="deleteBlockBtn">Supprimer</button>
+    <label>Date<br><input id="blockDateInput" type="date" value="${block.date}"></label><br><br>
+    <label>Heure<br><input id="blockTimeInput" type="time" value="${String(block.startHour).padStart(2, "0")}:${String(block.startMinute).padStart(2, "0")}"></label><br><br>
+    <label>Durée<br><input id="blockDurationInput" type="number" value="${block.duration}"></label><br><br>
+    <button id="saveBlockBtn" class="action-btn action-btn--accent">Sauver</button>
+    <button id="deleteBlockBtn" class="action-btn action-btn--danger">Supprimer</button>
   `, () => {
-    $("#saveBlockBtn")?.addEventListener("click", () => {
-      const [h, m] = $("#editBlockTime").value.split(":").map(Number)
+    qs("#saveBlockBtn").addEventListener("click", () => {
+      const [h, m] = qs("#blockTimeInput").value.split(":").map(Number)
       Scheduler.updateBlock(block.id, {
-        date: $("#editBlockDate").value,
+        date: qs("#blockDateInput").value,
         startHour: h,
         startMinute: m,
-        duration: Number($("#editBlockDuration").value || block.duration)
+        duration: Number(qs("#blockDurationInput").value || block.duration)
       })
       closeModal()
       renderAll()
     })
 
-    $("#deleteBlockBtn")?.addEventListener("click", () => {
+    qs("#deleteBlockBtn").addEventListener("click", () => {
       Scheduler.deleteBlock(block.id)
       closeModal()
       renderAll()
@@ -900,11 +779,11 @@ function openBlockEditModal(blockId) {
 function openSchedulerModal() {
   openModal(`
     <h2>Planification automatique</h2>
-    <p>Générer la semaine à partir des tâches non planifiées.</p>
-    <button id="runSchedulerBtn">Générer</button>
+    <p>Générer le planning hebdomadaire à partir des fragments non placés.</p>
+    <button id="runWeekSchedulerBtn" class="action-btn action-btn--accent">Générer</button>
   `, () => {
-    $("#runSchedulerBtn")?.addEventListener("click", () => {
-      Scheduler.generateWeekPlan(new Date(AppDate.fromISO(App.selectedDate)))
+    qs("#runWeekSchedulerBtn").addEventListener("click", () => {
+      Scheduler.generateWeekPlan(new Date(fromISO(App.selectedDate)))
       closeModal()
       renderAll()
     })
@@ -917,29 +796,144 @@ function openStatsModal() {
     <h2>Statistiques</h2>
     <p>Temps estimé : ${stats.estimated} min</p>
     <p>Temps réel : ${stats.real} min</p>
-    <p>Différence : ${stats.real - stats.estimated} min</p>
-    <p>Historique : ${Engine.state.history.length} entrée(s)</p>
+    <p>Écart : ${stats.delta} min</p>
+    <p>Projets : ${stats.projects}</p>
+    <p>Fragments : ${stats.tasks}</p>
+    <p>Terminés : ${stats.doneTasks}</p>
   `)
 }
 
-function openSettingsModal() {
+function openNotesModal() {
   openModal(`
-    <h2>Paramètres</h2>
-    <p>La police reste Yusei Magic, comme demandé. Pas de mutation capricieuse ici.</p>
-    <label>Type semaine
-      <select id="settingsWeekTypeModal">
-        <option value="work">Travail</option>
-        <option value="holiday">Congé</option>
-      </select>
-    </label>
+    <h2>Notes</h2>
+    <textarea id="notesTextArea" rows="12" class="field textarea" placeholder="Écris ici ce qui doit rester visible à l'esprit...">${localStorage.getItem("illuminator-notes") || ""}</textarea>
+    <br><br>
+    <button id="saveNotesBtn" class="action-btn action-btn--accent">Sauver</button>
   `, () => {
-    const weekType = $("#weekType")
-    const modalWeekType = $("#settingsWeekTypeModal")
-    if (weekType && modalWeekType) {
-      modalWeekType.value = weekType.value
-      modalWeekType.addEventListener("change", () => {
-        weekType.value = modalWeekType.value
-      })
-    }
+    qs("#saveNotesBtn").addEventListener("click", () => {
+      localStorage.setItem("illuminator-notes", qs("#notesTextArea").value)
+      closeModal()
+    })
   })
-      }
+}
+
+function openKiffanceModal() {
+  const ideas = [
+    "5 min de marche lente",
+    "1 rythme très court à la batterie",
+    "relire 1 paragraphe inspirant",
+    "écrire 3 idées sans filtre",
+    "respirer 10 cycles",
+    "ranger juste 1 zone"
+  ]
+
+  const pick = ideas[Math.floor(Math.random() * ideas.length)]
+
+  openModal(`
+    <h2>Kiffance</h2>
+    <div class="suggestion-box">${pick}</div>
+  `)
+}
+
+function openProjectChooserModal() {
+  openModal(`
+    <h2>Territoires</h2>
+    <div id="projectChooserList" class="stack">
+      ${Engine.state.projects.map(p => `<div class="project-task-row" data-project-id="${p.id}">${escapeHTML(p.name)} · ${p.progress}%</div>`).join("")}
+    </div>
+  `, () => {
+    qsa("#projectChooserList .project-task-row").forEach(row => {
+      row.addEventListener("click", () => {
+        closeModal()
+        openProjectDetailModal(row.dataset.projectId)
+      })
+    })
+  })
+}
+
+function openSuggestionModal() {
+  const best = Engine.suggestTask()
+  const random = Engine.randomTask()
+
+  openModal(`
+    <h2>Suggestion</h2>
+    <div class="suggestion-box">
+      <strong>Meilleure action</strong><br>
+      ${best ? escapeHTML(best.title) : "Aucune"}<br>
+      <small>${best ? best.duration + " min" : ""}</small>
+    </div>
+    <br>
+    <div class="suggestion-box">
+      <strong>Option aléatoire</strong><br>
+      ${random ? escapeHTML(random.title) : "Aucune"}<br>
+      <small>${random ? random.duration + " min" : ""}</small>
+    </div>
+    <br>
+    <button id="suggestBestBtn" class="action-btn action-btn--accent">Planifier la meilleure</button>
+    <button id="suggestRandomBtn" class="action-btn">Planifier l’aléatoire</button>
+  `, () => {
+    qs("#suggestBestBtn").addEventListener("click", () => {
+      if (!best) return
+      closeModal()
+      openTaskQuickModal(best.id, true)
+    })
+
+    qs("#suggestRandomBtn").addEventListener("click", () => {
+      if (!random) return
+      closeModal()
+      openTaskQuickModal(random.id, true)
+    })
+  })
+}
+
+function openManualBlockModal() {
+  openModal(`
+    <h2>Bloc libre</h2>
+    <label>Nom<br><input id="manualBlockTitle" value="Bloc libre"></label><br><br>
+    <label>Date<br><input id="manualBlockDate" type="date" value="${App.selectedDate}"></label><br><br>
+    <label>Heure<br><input id="manualBlockTime" type="time" value="20:00"></label><br><br>
+    <label>Durée<br><input id="manualBlockDuration" type="number" value="${Config.ui.timeline.defaultBlockDuration}"></label><br><br>
+    <button id="saveManualBlockBtn" class="action-btn action-btn--accent">Créer</button>
+  `, () => {
+    qs("#saveManualBlockBtn").addEventListener("click", () => {
+      const [h, m] = qs("#manualBlockTime").value.split(":").map(Number)
+      Scheduler.createManualBlock({
+        date: qs("#manualBlockDate").value,
+        startHour: h,
+        startMinute: m,
+        duration: Number(qs("#manualBlockDuration").value || Config.ui.timeline.defaultBlockDuration),
+        title: qs("#manualBlockTitle").value || "Bloc libre",
+        projectId: null
+      })
+      closeModal()
+      renderAll()
+    })
+  })
+}
+
+function importInbox() {
+  const raw = qs("#inboxText").value.trim()
+  if (!raw) return
+
+  const firstProject = Engine.state.projects[0]?.id || null
+  raw.split("\n").map(s => s.trim()).filter(Boolean).forEach(line => {
+    const match = line.match(/^(.*?)(?:\s*-\s*(\d+))?$/)
+    const title = match?.[1]?.trim() || line
+    const duration = Number(match?.[2] || 20)
+
+    Engine.state.tasks.push({
+      id: Engine.makeId(),
+      projectId: firstProject,
+      title,
+      duration,
+      energy: 1,
+      status: "pending",
+      scheduled: null,
+      realDuration: null
+    })
+  })
+
+  qs("#inboxText").value = ""
+  Engine.save()
+  renderAll()
+}
