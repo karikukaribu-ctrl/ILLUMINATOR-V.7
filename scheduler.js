@@ -1,67 +1,25 @@
-/* ============================= */
-/* ILLUMINATOR SCHEDULER */
-/* ============================= */
-
 const Scheduler = {}
 
-/* ============================= */
-/* DATA STORE */
-/* ============================= */
+Scheduler.pad = n => String(n).padStart(2, "0")
 
-if (!Engine.state.scheduledBlocks) {
-  Engine.state.scheduledBlocks = []
-}
+Scheduler.toMinutes = (h, m = 0) => h * 60 + m
 
-if (!Engine.state.weekTemplates) {
-  Engine.state.weekTemplates = {
-    work: {
-      label: "Semaine travail",
-      allowedWindows: [
-        { start: 8 * 60, end: 8 * 60 + 30, tag: "morning-write" },
-        { start: 12 * 60, end: 12 * 60 + 30, tag: "midday-short" },
-        { start: 20 * 60, end: 23 * 60, tag: "evening" }
-      ]
-    },
-    holiday: {
-      label: "Semaine congé",
-      allowedWindows: [
-        { start: 8 * 60, end: 23 * 60, tag: "free-day" }
-      ]
-    },
-    weekend: {
-      label: "Week-end",
-      allowedWindows: [
-        { start: 9 * 60, end: 13 * 60, tag: "weekend-focus" },
-        { start: 14 * 60, end: 18 * 60, tag: "weekend-flex" }
-      ]
-    }
-  }
-}
+Scheduler.fromMinutes = total => ({
+  hour: Math.floor(total / 60),
+  minute: total % 60
+})
 
-/* ============================= */
-/* HELPERS */
-/* ============================= */
-
-Scheduler.pad = function (n) {
-  return String(n).padStart(2, "0")
-}
-
-Scheduler.toMinutes = function (hour, minute = 0) {
-  return hour * 60 + minute
-}
-
-Scheduler.fromMinutes = function (total) {
-  const h = Math.floor(total / 60)
-  const m = total % 60
-  return { hour: h, minute: m }
-}
-
-Scheduler.toISODate = function (date) {
+Scheduler.toISODate = date => {
   const d = new Date(date)
   return `${d.getFullYear()}-${Scheduler.pad(d.getMonth() + 1)}-${Scheduler.pad(d.getDate())}`
 }
 
-Scheduler.startOfWeek = function (date = new Date()) {
+Scheduler.fromISO = iso => {
+  const [y, m, d] = iso.split("-").map(Number)
+  return new Date(y, m - 1, d)
+}
+
+Scheduler.startOfWeek = (date = new Date()) => {
   const d = new Date(date)
   const day = d.getDay()
   const diff = day === 0 ? -6 : 1 - day
@@ -70,44 +28,58 @@ Scheduler.startOfWeek = function (date = new Date()) {
   return d
 }
 
-Scheduler.addDays = function (date, n) {
+Scheduler.addDays = (date, n) => {
   const d = new Date(date)
   d.setDate(d.getDate() + n)
   return d
 }
 
-Scheduler.isWeekend = function (date) {
+Scheduler.roundQuarter = mins => Math.round(mins / 15) * 15
+
+Scheduler.makeBlockId = () => Engine.makeId()
+
+Scheduler.getWeekTypeForDate = (date) => {
   const d = new Date(date)
   const day = d.getDay()
-  return day === 0 || day === 6
+  if (day === 0 || day === 6) return "weekend"
+  return Engine.state.preferences.weekType === "holiday" ? "holiday" : "work"
 }
 
-Scheduler.roundToQuarter = function (minutes) {
-  return Math.round(minutes / 15) * 15
+Scheduler.getAllowedWindows = (date) => {
+  const weekType = Scheduler.getWeekTypeForDate(date)
+  return Config.planning.templates[weekType].allowedWindows
 }
 
-Scheduler.clamp = function (value, min, max) {
-  return Math.max(min, Math.min(max, value))
+Scheduler.getBlocksForDate = (isoDate) => {
+  return Engine.state.scheduledBlocks
+    .filter(b => b.date === isoDate)
+    .sort((a, b) => Scheduler.toMinutes(a.startHour, a.startMinute) - Scheduler.toMinutes(b.startHour, b.startMinute))
 }
 
-Scheduler.generateId = function () {
-  return crypto.randomUUID ? crypto.randomUUID() : `blk_${Date.now()}_${Math.random().toString(36).slice(2)}`
+Scheduler.getBlockById = (blockId) => {
+  return Engine.state.scheduledBlocks.find(b => b.id === blockId) || null
 }
 
-/* ============================= */
-/* BLOCK CRUD */
-/* ============================= */
+Scheduler.blockRange = (block) => {
+  const start = Scheduler.toMinutes(block.startHour, block.startMinute)
+  return { start, end: start + block.duration }
+}
 
-Scheduler.createBlock = function ({
-  taskId,
-  projectId,
-  date,
-  startHour,
-  startMinute,
-  duration
-}) {
+Scheduler.hasCollision = (candidate, ignoreId = null) => {
+  const blocks = Scheduler.getBlocksForDate(candidate.date)
+  const candStart = Scheduler.toMinutes(candidate.startHour, candidate.startMinute)
+  const candEnd = candStart + candidate.duration
+
+  return blocks.some(block => {
+    if (ignoreId && block.id === ignoreId) return false
+    const other = Scheduler.blockRange(block)
+    return candStart < other.end && candEnd > other.start
+  })
+}
+
+Scheduler.createBlock = ({ taskId, projectId, date, startHour, startMinute, duration }) => {
   const block = {
-    id: Scheduler.generateId(),
+    id: Scheduler.makeBlockId(),
     taskId,
     projectId,
     date,
@@ -121,105 +93,27 @@ Scheduler.createBlock = function ({
   return block
 }
 
-Scheduler.updateBlock = function (blockId, patch) {
-  const block = Engine.state.scheduledBlocks.find(b => b.id === blockId)
+Scheduler.updateBlock = (blockId, patch) => {
+  const block = Scheduler.getBlockById(blockId)
   if (!block) return null
-
   Object.assign(block, patch)
   Engine.save()
   return block
 }
 
-Scheduler.deleteBlock = function (blockId) {
+Scheduler.deleteBlock = (blockId) => {
   Engine.state.scheduledBlocks = Engine.state.scheduledBlocks.filter(b => b.id !== blockId)
   Engine.save()
 }
 
-Scheduler.getBlocksForDate = function (date) {
-  const iso = typeof date === "string" ? date : Scheduler.toISODate(date)
-  return Engine.state.scheduledBlocks
-    .filter(b => b.date === iso)
-    .sort((a, b) => {
-      const aMin = Scheduler.toMinutes(a.startHour, a.startMinute)
-      const bMin = Scheduler.toMinutes(b.startHour, b.startMinute)
-      return aMin - bMin
-    })
-}
-
-Scheduler.getBlockById = function (blockId) {
-  return Engine.state.scheduledBlocks.find(b => b.id === blockId) || null
-}
-
-/* ============================= */
-/* TASK / PROJECT HELPERS */
-/* ============================= */
-
-Scheduler.getTask = function (taskId) {
-  return Engine.state.tasks.find(t => t.id === taskId) || null
-}
-
-Scheduler.getProject = function (projectId) {
-  return Engine.state.projects.find(p => p.id === projectId) || null
-}
-
-/* ============================= */
-/* COLLISION CHECK */
-/* ============================= */
-
-Scheduler.blockRange = function (block) {
-  const start = Scheduler.toMinutes(block.startHour, block.startMinute)
-  const end = start + block.duration
-  return { start, end }
-}
-
-Scheduler.hasCollision = function (candidate, ignoreBlockId = null) {
-  const blocks = Scheduler.getBlocksForDate(candidate.date)
-
-  const cand = {
-    start: Scheduler.toMinutes(candidate.startHour, candidate.startMinute),
-    end: Scheduler.toMinutes(candidate.startHour, candidate.startMinute) + candidate.duration
-  }
-
-  return blocks.some(block => {
-    if (ignoreBlockId && block.id === ignoreBlockId) return false
-    const other = Scheduler.blockRange(block)
-    return cand.start < other.end && cand.end > other.start
-  })
-}
-
-/* ============================= */
-/* AVAILABLE WINDOWS */
-/* ============================= */
-
-Scheduler.getWeekTypeForDate = function (date) {
-  const selected = document.getElementById("weekType")?.value || "work"
-  const d = new Date(date)
-
-  if (Scheduler.isWeekend(d)) {
-    return "weekend"
-  }
-
-  return selected === "holiday" ? "holiday" : "work"
-}
-
-Scheduler.getAllowedWindowsForDate = function (date) {
-  const weekType = Scheduler.getWeekTypeForDate(date)
-  return Engine.state.weekTemplates[weekType].allowedWindows
-}
-
-/* ============================= */
-/* AUTO PLANIFICATION */
-/* ============================= */
-
-Scheduler.findSlotForTask = function (task, date) {
-  const windows = Scheduler.getAllowedWindowsForDate(date)
-  const dayBlocks = Scheduler.getBlocksForDate(date)
+Scheduler.findSlotForTask = (task, date) => {
+  const windows = Scheduler.getAllowedWindows(date)
 
   for (const win of windows) {
     let cursor = win.start
 
     while (cursor + task.duration <= win.end) {
-      const rounded = Scheduler.roundToQuarter(cursor)
+      const rounded = Scheduler.roundQuarter(cursor)
       const { hour, minute } = Scheduler.fromMinutes(rounded)
 
       const candidate = {
@@ -229,8 +123,7 @@ Scheduler.findSlotForTask = function (task, date) {
         duration: task.duration
       }
 
-      const tooLate = rounded + task.duration > win.end
-      if (!tooLate && !Scheduler.hasCollision(candidate)) {
+      if (!Scheduler.hasCollision(candidate)) {
         return candidate
       }
 
@@ -241,7 +134,7 @@ Scheduler.findSlotForTask = function (task, date) {
   return null
 }
 
-Scheduler.scheduleTask = function (task, date) {
+Scheduler.scheduleTask = (task, date) => {
   const slot = Scheduler.findSlotForTask(task, date)
   if (!slot) return null
 
@@ -255,25 +148,20 @@ Scheduler.scheduleTask = function (task, date) {
   })
 }
 
-Scheduler.generateWeekPlan = function (startDate = new Date()) {
+Scheduler.generateWeekPlan = (startDate = new Date()) => {
   const monday = Scheduler.startOfWeek(startDate)
   const dates = Array.from({ length: 7 }, (_, i) => Scheduler.addDays(monday, i))
 
-  const unscheduledTasks = Engine.state.tasks.filter(t => {
+  const pending = Engine.state.tasks.filter(t => {
     if (t.status === "done") return false
-    const alreadyScheduled = Engine.state.scheduledBlocks.some(b => b.taskId === t.id)
-    return !alreadyScheduled
+    return !Engine.state.scheduledBlocks.some(b => b.taskId === t.id)
   })
 
-  const sortedTasks = unscheduledTasks.slice().sort((a, b) => {
-    const scoreA = Engine.scoreTask(a, 20)
-    const scoreB = Engine.scoreTask(b, 20)
-    return scoreB - scoreA
-  })
+  pending.sort((a, b) => Engine.scoreTask(b, 20) - Engine.scoreTask(a, 20))
 
   const created = []
 
-  for (const task of sortedTasks) {
+  for (const task of pending) {
     for (const date of dates) {
       const block = Scheduler.scheduleTask(task, date)
       if (block) {
@@ -287,172 +175,22 @@ Scheduler.generateWeekPlan = function (startDate = new Date()) {
   return created
 }
 
-/* ============================= */
-/* DRAG & DROP + EDITABLE BLOCKS */
-/* ============================= */
-
-Scheduler.dragState = {
-  blockId: null,
-  startY: 0,
-  originalMinutes: 0,
-  originalDuration: 0,
-  resizeMode: false
-}
-
-Scheduler.attachBlockInteractions = function (blockEl, block) {
-  const handle = blockEl.querySelector(".timeline-block__resize")
-  const body = blockEl.querySelector(".timeline-block__body")
-
-  if (!body) return
-
-  body.addEventListener("mousedown", (e) => {
-    e.preventDefault()
-    Scheduler.dragState.blockId = block.id
-    Scheduler.dragState.startY = e.clientY
-    Scheduler.dragState.originalMinutes = Scheduler.toMinutes(block.startHour, block.startMinute)
-    Scheduler.dragState.originalDuration = block.duration
-    Scheduler.dragState.resizeMode = false
-    document.body.classList.add("dragging-block")
-  })
-
-  if (handle) {
-    handle.addEventListener("mousedown", (e) => {
-      e.preventDefault()
-      e.stopPropagation()
-      Scheduler.dragState.blockId = block.id
-      Scheduler.dragState.startY = e.clientY
-      Scheduler.dragState.originalMinutes = Scheduler.toMinutes(block.startHour, block.startMinute)
-      Scheduler.dragState.originalDuration = block.duration
-      Scheduler.dragState.resizeMode = true
-      document.body.classList.add("dragging-block")
-    })
-  }
-}
-
-Scheduler.handlePointerMove = function (e) {
-  const state = Scheduler.dragState
-  if (!state.blockId) return
-
-  const block = Scheduler.getBlockById(state.blockId)
-  if (!block) return
-
-  const timeline = document.getElementById("timelineContainer")
-  if (!timeline) return
-
-  const pxPer15Min = Number(timeline.dataset.pxPer15 || 20)
-  const deltaY = e.clientY - state.startY
-  const deltaSlots = Math.round(deltaY / pxPer15Min)
-  const deltaMinutes = deltaSlots * 15
-
-  if (state.resizeMode) {
-    const newDuration = Scheduler.clamp(
-      Scheduler.roundToQuarter(state.originalDuration + deltaMinutes),
-      15,
-      240
-    )
-
-    const candidate = {
-      ...block,
-      duration: newDuration
-    }
-
-    if (!Scheduler.hasCollision(candidate, block.id)) {
-      Scheduler.updateBlock(block.id, { duration: newDuration })
-      Scheduler.requestRender?.()
-    }
-  } else {
-    const movedMinutes = Scheduler.clamp(
-      Scheduler.roundToQuarter(state.originalMinutes + deltaMinutes),
-      6 * 60,
-      23 * 60
-    )
-
-    const { hour, minute } = Scheduler.fromMinutes(movedMinutes)
-    const candidate = {
-      ...block,
-      startHour: hour,
-      startMinute: minute
-    }
-
-    if (!Scheduler.hasCollision(candidate, block.id)) {
-      Scheduler.updateBlock(block.id, {
-        startHour: hour,
-        startMinute: minute
-      })
-      Scheduler.requestRender?.()
-    }
-  }
-}
-
-Scheduler.handlePointerUp = function () {
-  if (!Scheduler.dragState.blockId) return
-  Scheduler.dragState.blockId = null
-  Scheduler.dragState.resizeMode = false
-  document.body.classList.remove("dragging-block")
-  Engine.save()
-}
-
-document.addEventListener("mousemove", Scheduler.handlePointerMove)
-document.addEventListener("mouseup", Scheduler.handlePointerUp)
-
-/* ============================= */
-/* TIMELINE RENDER DATA */
-/* ============================= */
-
-Scheduler.getTimelineRows = function (date, startHour = 6, endHour = 23) {
-  const rows = []
-  for (let h = startHour; h <= endHour; h++) {
-    for (let m = 0; m < 60; m += 15) {
-      rows.push({
-        hour: h,
-        minute: m,
-        label: `${Scheduler.pad(h)}:${Scheduler.pad(m)}`,
-        minuteValue: Scheduler.toMinutes(h, m)
-      })
-    }
-  }
-
-  const blocks = Scheduler.getBlocksForDate(date).map(block => {
-    const task = Scheduler.getTask(block.taskId)
-    const project = Scheduler.getProject(block.projectId)
-
-    return {
-      ...block,
-      taskTitle: task?.title || "Tâche",
-      projectName: project?.name || "Projet",
-      color: project?.color || "#c56f35"
-    }
-  })
-
-  return { rows, blocks }
-}
-
-/* ============================= */
-/* MANUAL BLOCK CREATION */
-/* ============================= */
-
-Scheduler.createManualBlock = function ({
-  date,
-  startHour,
-  startMinute,
-  duration,
-  title = "Bloc libre",
-  projectId = null
-}) {
-  const fakeTaskId = Scheduler.generateId()
+Scheduler.createManualBlock = ({ date, startHour, startMinute, duration, title = "Bloc libre", projectId = null }) => {
+  const taskId = Engine.makeId()
 
   Engine.state.tasks.push({
-    id: fakeTaskId,
+    id: taskId,
     projectId,
     title,
     duration,
     energy: 1,
     status: "pending",
-    scheduled: date
+    scheduled: date,
+    realDuration: null
   })
 
   const block = Scheduler.createBlock({
-    taskId: fakeTaskId,
+    taskId,
     projectId,
     date,
     startHour,
@@ -464,54 +202,103 @@ Scheduler.createManualBlock = function ({
   return block
 }
 
-/* ============================= */
-/* REAL VS ESTIMATED BY BLOCK */
-/* ============================= */
+Scheduler.requestRender = null
 
-Scheduler.attachRealDurationToTask = function (blockId, realDuration) {
-  const block = Scheduler.getBlockById(blockId)
+Scheduler.dragState = {
+  blockId: null,
+  startY: 0,
+  originalStart: 0,
+  originalDuration: 0,
+  resizeMode: false
+}
+
+Scheduler.attachBlockInteractions = (element, block) => {
+  const body = element.querySelector(".timeline-block__body")
+  const resize = element.querySelector(".timeline-block__resize")
+
+  body?.addEventListener("mousedown", (e) => {
+    e.preventDefault()
+    Scheduler.dragState.blockId = block.id
+    Scheduler.dragState.startY = e.clientY
+    Scheduler.dragState.originalStart = Scheduler.toMinutes(block.startHour, block.startMinute)
+    Scheduler.dragState.originalDuration = block.duration
+    Scheduler.dragState.resizeMode = false
+    document.body.classList.add("dragging-block")
+  })
+
+  resize?.addEventListener("mousedown", (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    Scheduler.dragState.blockId = block.id
+    Scheduler.dragState.startY = e.clientY
+    Scheduler.dragState.originalStart = Scheduler.toMinutes(block.startHour, block.startMinute)
+    Scheduler.dragState.originalDuration = block.duration
+    Scheduler.dragState.resizeMode = true
+    document.body.classList.add("dragging-block")
+  })
+}
+
+document.addEventListener("mousemove", (e) => {
+  const state = Scheduler.dragState
+  if (!state.blockId) return
+
+  const block = Scheduler.getBlockById(state.blockId)
   if (!block) return
 
-  const task = Scheduler.getTask(block.taskId)
-  if (!task) return
+  const deltaY = e.clientY - state.startY
+  const pxPer15 = Config.ui.timeline.pxPer15Min
+  const deltaSlots = Math.round(deltaY / pxPer15)
+  const deltaMinutes = deltaSlots * 15
 
-  task.realDuration = realDuration
-  Engine.save()
-}
-
-/* ============================= */
-/* CLEANUP / RESCHEDULE */
-/* ============================= */
-
-Scheduler.rescheduleBlockToDate = function (blockId, newDate) {
-  const block = Scheduler.getBlockById(blockId)
-  if (!block) return null
-
-  const candidate = {
-    ...block,
-    date: newDate
-  }
-
-  if (Scheduler.hasCollision(candidate, block.id)) {
-    const task = Scheduler.getTask(block.taskId)
-    const tempTask = {
-      duration: task?.duration || block.duration
+  if (state.resizeMode) {
+    const newDuration = Math.max(15, Scheduler.roundQuarter(state.originalDuration + deltaMinutes))
+    const candidate = { ...block, duration: newDuration }
+    if (!Scheduler.hasCollision(candidate, block.id)) {
+      Scheduler.updateBlock(block.id, { duration: newDuration })
+      Scheduler.requestRender && Scheduler.requestRender()
     }
-    const slot = Scheduler.findSlotForTask(tempTask, newDate)
-    if (!slot) return null
+  } else {
+    const moved = Math.max(Scheduler.toMinutes(Config.ui.timeline.startHour, 0), Scheduler.roundQuarter(state.originalStart + deltaMinutes))
+    const { hour, minute } = Scheduler.fromMinutes(moved)
+    const candidate = { ...block, startHour: hour, startMinute: minute }
+    if (!Scheduler.hasCollision(candidate, block.id)) {
+      Scheduler.updateBlock(block.id, { startHour: hour, startMinute: minute })
+      Scheduler.requestRender && Scheduler.requestRender()
+    }
+  }
+})
 
-    return Scheduler.updateBlock(blockId, {
-      date: slot.date,
-      startHour: slot.startHour,
-      startMinute: slot.startMinute
-    })
+document.addEventListener("mouseup", () => {
+  if (!Scheduler.dragState.blockId) return
+  Scheduler.dragState.blockId = null
+  Scheduler.dragState.resizeMode = false
+  document.body.classList.remove("dragging-block")
+  Engine.save()
+})
+
+Scheduler.getTimelineRows = (isoDate) => {
+  const rows = []
+  for (let h = Config.ui.timeline.startHour; h <= Config.ui.timeline.endHour; h++) {
+    for (let m = 0; m < 60; m += Config.ui.timeline.minutesStep) {
+      rows.push({
+        hour: h,
+        minute: m,
+        label: `${Scheduler.pad(h)}:${Scheduler.pad(m)}`,
+        minuteValue: Scheduler.toMinutes(h, m)
+      })
+    }
   }
 
-  return Scheduler.updateBlock(blockId, { date: newDate })
+  const blocks = Scheduler.getBlocksForDate(isoDate).map(block => {
+    const task = Engine.getTask(block.taskId)
+    const project = Engine.getProject(block.projectId)
+    return {
+      ...block,
+      taskTitle: task?.title || "Tâche",
+      projectName: project?.name || "Projet",
+      color: project?.color || Config.projectDefaults.color
+    }
+  })
+
+  return { rows, blocks }
 }
-
-/* ============================= */
-/* REQUEST RENDER HOOK */
-/* ============================= */
-
-Scheduler.requestRender = null
