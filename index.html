@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+
+<meta charset="UTF-8">
+<title>Illuminator</title>
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<link href="https://fonts.googleapis.com/css2?family=Yusei+Magic&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="styles.css">
+
+</head>
+
+<body class="theme-automne">
+
+<!-- ============================= -->
+<!-- TOPBAR -->
+<!-- ============================= -->
+
+<header class="topbar">
+
+<div class="logo">
+Illuminator
+</div>
+
+<nav class="view-selector">
+
+<button data-view="day">Jour</button>
+<button data-view="week">Semaine</button>
+<button data-view="month">Mois</button>
+<button data-view="projects">Projets</button>
+<button data-view="timeline">Timeline</button>
+<button data-view="map">Carte</button>
+
+</nav>
+
+<div class="controls">
+
+<select id="seasonSelector">
+<option value="automne">Automne</option>
+<option value="printemps">Printemps</option>
+<option value="ete">Été</option>
+<option value="hiver">Hiver</option>
+</select>
+
+<button id="darkToggle">
+Sombre
+</button>
+
+<button id="focusToggle">
+Focus
+</button>
+
+<button id="aiSuggest">
+Suggestion IA
+</button>
+
+</div>
+
+</header>
+
+<!-- ============================= -->
+<!-- LAYOUT -->
+<!-- ============================= -->
+
+<div class="layout">
+
+<!-- ============================= -->
+<!-- LEFT PANEL -->
+<!-- ============================= -->
+
+<aside class="panel-left">
+
+<h2>Projets</h2>
+
+<div id="projectList"></div>
+
+<button id="newProjectButton">
++ Nouveau projet
+</button>
+
+<hr>
+
+<h3>Quêtes actives</h3>
+
+<div id="activeTasks"></div>
+
+</aside>
+
+
+<!-- ============================= -->
+<!-- CENTRAL PANEL -->
+<!-- ============================= -->
+
+<main class="panel-center">
+
+<!-- Dashboard -->
+
+<section id="dashboardView" class="view">
+
+<div class="dashboard-header">
+
+<h1>Aujourd'hui</h1>
+
+<div id="todayProgress"></div>
+
+</div>
+
+<div id="todayTimeline"></div>
+
+</section>
+
+<!-- Week -->
+
+<section id="weekView" class="view hidden">
+
+<h1>Semaine</h1>
+
+<div id="weekGrid"></div>
+
+</section>
+
+<!-- Month -->
+
+<section id="monthView" class="view hidden">
+
+<h1>Mois</h1>
+
+<div id="monthGrid"></div>
+
+</section>
+
+<!-- Projects -->
+
+<section id="projectsView" class="view hidden">
+
+<h1>Projets</h1>
+
+<div id="projectCards"></div>
+
+</section>
+
+<!-- Timeline -->
+
+<section id="timelineView" class="view hidden">
+
+<h1>Ligne du temps</h1>
+
+<div id="timelineContainer"></div>
+
+</section>
+
+<!-- Map view -->
+
+<section id="mapView" class="view hidden">
+
+<h1>Carte des projets</h1>
+
+<canvas id="projectMap"></canvas>
+
+</section>
+
+</main>
+
+
+<!-- ============================= -->
+<!-- RIGHT PANEL -->
+<!-- ============================= -->
+
+<aside class="panel-right">
+
+<h3>Préférences cognitives</h3>
+
+<div class="preferences">
+
+<label>
+Type de semaine
+<select id="weekType">
+<option value="work">Semaine travail</option>
+<option value="holiday">Semaine congé</option>
+</select>
+</label>
+
+<label>
+Heure énergie max
+<input type="range" id="energyPeak" min="6" max="23">
+</label>
+
+<label>
+Durée focus
+<input type="number" id="focusDuration" value="40">
+</label>
+
+</div>
+
+<hr>
+
+<h3>Heatmap énergie</h3>
+
+<div id="energyHeatmap"></div>
+
+<hr>
+
+<h3>Statistiques</h3>
+
+<div id="statsPanel"></div>
+
+</aside>
+
+</div>
+
+<!-- ============================= -->
+<!-- FOOTER ACTION BAR -->
+<!-- ============================= -->
+
+<footer class="action-bar">
+
+<button id="openScheduler">
+Planification automatique
+</button>
+
+<button id="openStats">
+Statistiques
+</button>
+
+<button id="openSettings">
+Paramètres
+</button>
+
+</footer>
+
+<!-- ============================= -->
+<!-- MODALS -->
+<!-- ============================= -->
+
+<div id="modalLayer"></div>
+
+<!-- ============================= -->
+<!-- SCRIPTS -->
+<!-- ============================= -->
+
+<script src="config.js"></script>
+<script src="engine.js"></script>
+<script src="scheduler.js"></script>
+<script src="app.js"></script>
+
+</body>
+</html>
