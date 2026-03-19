@@ -1,69 +1,73 @@
 const Config = {
   app: {
     name: "Illuminator",
-    version: "6.1.0",
-    storageKey: "illuminator-v61-state",
-    defaultView: "day"
-  },
-
-  ui: {
-    timeline: {
-      startHour: 6,
-      endHour: 23,
-      minutesStep: 15,
-      pxPer15Min: 22,
-      defaultBlockDuration: 30
-    },
-    map: {
-      width: 1000,
-      height: 420
-    }
+    version: "30.0.0",
+    storageKey: "illuminator-v30-state",
+    defaultView: "atlas",
+    defaultCortex: "vision"
   },
 
   planning: {
     templates: {
       work: {
-        label: "Semaine travail",
-        allowedWindows: [
+        windows: [
           { start: 8 * 60, end: 8 * 60 + 30, tag: "morning-write" },
           { start: 12 * 60, end: 12 * 60 + 30, tag: "midday-short" },
           { start: 20 * 60, end: 23 * 60, tag: "evening" }
-        ],
-        maxDailyWritingMinutesAtWork: 30
+        ]
       },
       holiday: {
-        label: "Semaine congé",
-        allowedWindows: [
+        windows: [
           { start: 8 * 60, end: 23 * 60, tag: "free-day" }
-        ],
-        maxDailyWritingMinutesAtWork: 999
+        ]
       },
       weekend: {
-        label: "Week-end",
-        allowedWindows: [
-          { start: 9 * 60, end: 13 * 60, tag: "weekend-focus" }
-        ],
-        maxDailyWritingMinutesAtWork: 240
+        windows: [
+          { start: 9 * 60, end: 13 * 60, tag: "weekend-focus" },
+          { start: 14 * 60, end: 18 * 60, tag: "weekend-flex" }
+        ]
       }
-    }
+    },
+    defaultDuration: 30,
+    timelineStart: 6,
+    timelineEnd: 23,
+    pxPer15Min: 24,
+    minZoom: 0.75,
+    maxZoom: 2.4,
+    defaultZoom: 1
   },
 
   defaults: {
     season: "automne",
     mode: "light",
+    fog: "soft",
     focus: false,
+    weather: "clear",
+    weekType: "work",
     energyPeak: 21,
     focusDuration: 40,
-    weekType: "work"
+    clarity: 6,
+    anchor: 5,
+    momentum: 5
   },
 
-  projectDefaults: {
+  questDefaults: {
     priority: 3,
     weeklyTarget: 3,
     energyRequired: 2,
     fragmentDuration: 30,
     fragments: 8,
     color: "#7c4a2d"
+  },
+
+  atlas: {
+    fragmentRadius: 96
+  },
+
+  stickyDefaults: {
+    x: 40,
+    y: 40,
+    text: "Note rapide"
   },
 
   googleCalendar: {
@@ -82,9 +86,7 @@ const GoogleCalendarBridge = {
   isReady() {
     return !!(
       Config.googleCalendar.enabled &&
-      Config.googleCalendar.clientId &&
       Config.googleCalendar.clientId !== "YOUR_GOOGLE_CLIENT_ID" &&
-      Config.googleCalendar.apiKey &&
       Config.googleCalendar.apiKey !== "YOUR_GOOGLE_API_KEY" &&
       window.gapi
     )
@@ -124,10 +126,10 @@ const GoogleCalendarBridge = {
   async listWeekEvents(startISO, endISO) {
     if (!this.isReady()) return []
 
-    const signed = await this.signIn()
-    if (!signed) return []
+    const ok = await this.signIn()
+    if (!ok) return []
 
-    const out = []
+    const all = []
 
     for (const calendarId of Config.googleCalendar.calendarIds) {
       const response = await window.gapi.client.calendar.events.list({
@@ -141,16 +143,15 @@ const GoogleCalendarBridge = {
 
       const items = response.result.items || []
       items.forEach(item => {
-        out.push({
+        all.push({
           id: item.id,
           title: item.summary || "Événement",
           start: item.start?.dateTime || item.start?.date,
-          end: item.end?.dateTime || item.end?.date,
-          source: "google-calendar"
+          end: item.end?.dateTime || item.end?.date
         })
       })
     }
 
-    return out
+    return all
   }
 }
